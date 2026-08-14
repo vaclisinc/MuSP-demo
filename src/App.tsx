@@ -260,9 +260,6 @@ function AudioPlayer({ piece, title }: { piece: string; title: string }) {
           </div>
         </div>
       </div>
-      <div className="waveform" aria-hidden="true">
-        {[12, 22, 38, 18, 46, 29, 54, 34, 18, 42, 62, 48, 25, 38, 52, 31, 18, 44, 58, 35, 21, 38, 49, 28, 16, 33, 42, 22, 12].map((height, index) => <i key={index} style={{ height }} />)}
-      </div>
     </div>
   );
 }
@@ -285,7 +282,7 @@ function Evidence({ question }: { question: Question }) {
   const hasScore = question.modality === "S" || question.modality === "SP" || question.modality === "S/P";
   const hasAudio = question.modality === "P" || question.modality === "SP" || question.modality === "S/P";
   return (
-    <div className={`evidence-workbench ${hasScore && hasAudio ? "split" : ""}`}>
+    <div className={`evidence-workbench ${hasScore && hasAudio ? "both" : ""} ${hasScore ? "has-score" : "audio-only"}`}>
       {hasScore && <ScoreViewer piece={question.piece} title={question.title} />}
       {hasAudio && <AudioPlayer piece={question.piece} title={`${question.composer} — ${question.title}`} />}
     </div>
@@ -295,23 +292,24 @@ function Evidence({ question }: { question: Question }) {
 export default function App() {
   const [activeLayer, setActiveLayer] = useState<LayerId>("signal");
   const [activeModality, setActiveModality] = useState<Modality | "ALL">("ALL");
-  const [expandedQuestion, setExpandedQuestion] = useState<string>("Q2");
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string>("Q2");
 
   const filteredQuestions = useMemo(
     () => questions.filter((question) => question.layer === activeLayer && (activeModality === "ALL" || question.modality === activeModality)),
     [activeLayer, activeModality],
   );
+  const selectedQuestion = filteredQuestions.find((question) => question.id === selectedQuestionId) ?? filteredQuestions[0];
 
   const chooseLayer = (id: LayerId) => {
     setActiveLayer(id);
     const first = questions.find((question) => question.layer === id && (activeModality === "ALL" || question.modality === activeModality));
-    setExpandedQuestion(first?.id ?? "");
+    setSelectedQuestionId(first?.id ?? "");
   };
 
   const chooseModality = (id: Modality | "ALL") => {
     setActiveModality(id);
     const first = questions.find((question) => question.layer === activeLayer && (id === "ALL" || question.modality === id));
-    setExpandedQuestion(first?.id ?? "");
+    setSelectedQuestionId(first?.id ?? "");
   };
 
   return (
@@ -331,37 +329,38 @@ export default function App() {
       <section className="hero" id="top">
         <div className="hero-copy">
           <p className="kicker">MuSP-Bench · Research demo</p>
-          <h1>Can multimodal models understand how a score becomes a <em>performance?</em></h1>
+          <h1>A benchmark for musical score–performance <em>understanding.</em></h1>
           <p className="hero-lede">
-            MuSP-Bench evaluates analytical and interpretive reasoning across complete musical scores and their performances. Its human-authored questions ask models to read notation, hear performed choices, connect the two, and integrate evidence from a single event to an entire work.
+            Human-authored questions spanning score reading, performance listening, and reasoning across both.
           </p>
-          <div className="research-axes" aria-label="Benchmark annotation dimensions">
-            <span><b>Content</b> pitch → context</span>
-            <span><b>Modality</b> S · P · SP · S/P</span>
-            <span><b>Horizon</b> short → long</span>
-            <span><b>Action</b> identify → explain</span>
-          </div>
           <a className="primary-button" href="#explorer">Explore representative questions <span>↓</span></a>
         </div>
-        <aside className="research-note">
-          <span>BENCHMARK SCOPE</span>
-          <p>Questions range from literal score reading to long-horizon judgments about phrasing, rubato, voicing, form, timbre, and expressive intent.</p>
-          <div className="score-performance-diagram">
-            <div><b>Score</b><small>structure & intent</small><i>𝄞 ♩ ♪ ♩ 𝄐</i></div>
-            <span>↔</span>
-            <div><b>Performance</b><small>realization & choice</small><i>▂▅▇▃▁▆▇▅▂</i></div>
-          </div>
-        </aside>
+        <div className="hero-stair" aria-label="Question hierarchy from local evidence to whole-work understanding">
+          <p className="stair-label">From musical detail to whole-work understanding</p>
+          {[...layers].reverse().map((layer, index) => (
+            <button
+              key={layer.id}
+              className={`stair stair-${index + 1}`}
+              style={{ "--step-color": layer.color } as CSSProperties}
+              onClick={() => { chooseLayer(layer.id); document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" }); }}
+            >
+              <span>{layer.number}</span>
+              <strong>{layer.title}</strong>
+              <small>{layer.short}</small>
+            </button>
+          ))}
+          <div className="stair-axis"><span>local evidence</span><span>global reasoning</span></div>
+        </div>
       </section>
 
       <section className="explorer section" id="explorer">
         <div className="section-heading compact">
           <div>
-            <p className="section-number">03 / QUESTION EXPLORER</p>
-            <h2>Questions with their<br /><em>required evidence.</em></h2>
+            <p className="section-number">QUESTION EXPLORER</p>
+            <h2>Read the question.<br /><em>Inspect the evidence.</em></h2>
           </div>
           <div className="explorer-intro">
-            <p>Select a content level and modality. Open a question to inspect the score, listen to the performance, and see the expected answer contract.</p>
+            <p>Select a question on the left. Its score or performance stays visible on the right.</p>
             <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">View the full dataset on Hugging Face <span>↗</span></a>
           </div>
         </div>
@@ -388,54 +387,60 @@ export default function App() {
           </div>
         </div>
 
-        <div className="results-topline">
-          <span>{filteredQuestions.length} curated example{filteredQuestions.length === 1 ? "" : "s"}</span>
-          <span>From the released 490-question CSV</span>
-        </div>
-
-        <div className="question-list">
-          {filteredQuestions.length > 0 ? filteredQuestions.map((question) => {
-            const open = expandedQuestion === question.id;
-            const modality = modalityById[question.modality];
-            return (
-              <article className={`question-card ${open ? "open" : ""}`} key={question.id}>
-                <button className="question-summary" onClick={() => setExpandedQuestion(open ? "" : question.id)} aria-expanded={open}>
-                  <span className={`route route-${question.modality.replace("/", "-")}`}>{question.modality}</span>
-                  <span className="question-main">
-                    <small>{question.id} · {question.composer} · {question.title}</small>
-                    <strong>{question.question}</strong>
-                  </span>
-                  <span className="question-scope">{question.scope}</span>
-                  <span className="question-toggle" aria-hidden="true">{open ? "−" : "+"}</span>
-                </button>
-                {open && (
-                  <div className="question-detail">
-                    <div className="question-metadata">
-                      <div className="route-description"><span>{modality.id}</span><p><strong>{modality.label}</strong>{modality.description}</p></div>
-                      <div className="answer-contract">
-                        <p className="mini-label">Answer contract</p>
-                        <dl>
-                          <div><dt>Object</dt><dd>{question.answerType}</dd></div>
-                          <div><dt>Format</dt><dd>{question.answerFormat}</dd></div>
-                          <div><dt>Quantity</dt><dd>{question.answerQuantity}</dd></div>
-                        </dl>
-                        <div className="format-example"><span>Format example</span><code>{question.formatExample}</code></div>
-                        <p className="example-note">Response-shape example from the release, not the ground-truth answer.</p>
-                      </div>
-                    </div>
-                    <Evidence question={question} />
-                  </div>
-                )}
+        {selectedQuestion ? (
+          <div className="explorer-workspace">
+            <div className="question-pane">
+              <div className="results-topline">
+                <span>{filteredQuestions.length} example{filteredQuestions.length === 1 ? "" : "s"}</span>
+                <span>Select a question</span>
+              </div>
+              <div className="question-index">
+                {filteredQuestions.map((question) => (
+                  <button
+                    key={question.id}
+                    className={selectedQuestion.id === question.id ? "active" : ""}
+                    onClick={() => setSelectedQuestionId(question.id)}
+                    aria-pressed={selectedQuestion.id === question.id}
+                  >
+                    <span className={`route route-${question.modality.replace("/", "-")}`}>{question.modality}</span>
+                    <span><small>{question.id} · {question.composer}</small><strong>{question.question}</strong></span>
+                  </button>
+                ))}
+              </div>
+              <article className="selected-question">
+                <div className="selected-meta">
+                  <span>{selectedQuestion.id}</span>
+                  <span>{selectedQuestion.composer} · {selectedQuestion.title}</span>
+                  <span>{selectedQuestion.scope}</span>
+                </div>
+                <h3>{selectedQuestion.question}</h3>
+                <div className="route-description">
+                  <span>{selectedQuestion.modality}</span>
+                  <p><strong>{modalityById[selectedQuestion.modality].label}</strong>{modalityById[selectedQuestion.modality].description}</p>
+                </div>
+                <div className="answer-contract">
+                  <p className="mini-label">Answer contract</p>
+                  <dl>
+                    <div><dt>Object</dt><dd>{selectedQuestion.answerType}</dd></div>
+                    <div><dt>Format</dt><dd>{selectedQuestion.answerFormat}</dd></div>
+                    <div><dt>Quantity</dt><dd>{selectedQuestion.answerQuantity}</dd></div>
+                  </dl>
+                  <div className="format-example"><span>Format example</span><code>{selectedQuestion.formatExample}</code></div>
+                  <p className="example-note">Response-shape example, not the ground-truth answer.</p>
+                </div>
               </article>
-            );
-          }) : (
+            </div>
+            <aside className="evidence-pane">
+              <Evidence question={selectedQuestion} />
+            </aside>
+          </div>
+        ) : (
             <div className="empty-state">
               <span>∅</span><h3>No curated example in this slice—yet.</h3>
               <p>The released dataset still contains questions for this route. Choose “All routes” to continue the guided tour.</p>
               <button onClick={() => chooseModality("ALL")}>Show all routes</button>
             </div>
-          )}
-        </div>
+        )}
       </section>
 
       <footer>
