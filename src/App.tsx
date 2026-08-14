@@ -1,6 +1,5 @@
-"use client";
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 type Modality = "S" | "P" | "SP" | "S/P";
 type LayerId = "signal" | "time" | "language" | "structure" | "meaning";
@@ -184,7 +183,6 @@ const questions: Question[] = [
   },
 ];
 
-const layerById = Object.fromEntries(layers.map((layer) => [layer.id, layer])) as Record<LayerId, (typeof layers)[number]>;
 const modalityById = Object.fromEntries(modalities.map((item) => [item.id, item])) as Record<Modality, (typeof modalities)[number]>;
 
 function scoreUrl(piece: string) {
@@ -195,7 +193,106 @@ function audioUrl(piece: string) {
   return `${HF_ROOT}/audio/piece-${piece}.mp3`;
 }
 
-export default function Home() {
+function formatTime(value: number) {
+  if (!Number.isFinite(value)) return "0:00";
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function AudioPlayer({ piece, title }: { piece: string; title: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+  }, [piece]);
+
+  const toggle = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) await audio.play();
+    else audio.pause();
+  };
+
+  return (
+    <div className="audio-player">
+      <audio
+        ref={audioRef}
+        src={audioUrl(piece)}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+      />
+      <div className="audio-heading">
+        <span>PERFORMANCE AUDIO</span>
+        <a href={audioUrl(piece)} target="_blank" rel="noreferrer">source ↗</a>
+      </div>
+      <div className="audio-main">
+        <button className="play-button" onClick={toggle} aria-label={playing ? `Pause ${title}` : `Play ${title}`}>
+          {playing ? <span className="pause-icon"><i /><i /></span> : <span className="play-icon" />}
+        </button>
+        <div className="audio-track">
+          <strong>{title}</strong>
+          <div className="timeline">
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              step="0.1"
+              value={Math.min(currentTime, duration || 0)}
+              aria-label="Audio position"
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (audioRef.current) audioRef.current.currentTime = next;
+                setCurrentTime(next);
+              }}
+              style={{ "--progress": `${duration ? (currentTime / duration) * 100 : 0}%` } as CSSProperties}
+            />
+            <div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div className="waveform" aria-hidden="true">
+        {[12, 22, 38, 18, 46, 29, 54, 34, 18, 42, 62, 48, 25, 38, 52, 31, 18, 44, 58, 35, 21, 38, 49, 28, 16, 33, 42, 22, 12].map((height, index) => <i key={index} style={{ height }} />)}
+      </div>
+    </div>
+  );
+}
+
+function ScoreViewer({ piece, title }: { piece: string; title: string }) {
+  const url = scoreUrl(piece);
+  return (
+    <div className="score-viewer">
+      <div className="viewer-heading">
+        <span>SCORE PDF</span>
+        <a href={url} target="_blank" rel="noreferrer">open full score ↗</a>
+      </div>
+      <iframe src={`${url}#page=1&view=FitH`} title={`Score for ${title}`} loading="lazy" />
+      <p>If the embedded viewer is unavailable in your browser, <a href={url} target="_blank" rel="noreferrer">open the PDF directly</a>.</p>
+    </div>
+  );
+}
+
+function Evidence({ question }: { question: Question }) {
+  const hasScore = question.modality === "S" || question.modality === "SP" || question.modality === "S/P";
+  const hasAudio = question.modality === "P" || question.modality === "SP" || question.modality === "S/P";
+  return (
+    <div className={`evidence-workbench ${hasScore && hasAudio ? "split" : ""}`}>
+      {hasScore && <ScoreViewer piece={question.piece} title={question.title} />}
+      {hasAudio && <AudioPlayer piece={question.piece} title={`${question.composer} — ${question.title}`} />}
+    </div>
+  );
+}
+
+export default function App() {
   const [activeLayer, setActiveLayer] = useState<LayerId>("signal");
   const [activeModality, setActiveModality] = useState<Modality | "ALL">("ALL");
   const [expandedQuestion, setExpandedQuestion] = useState<string>("Q2");
@@ -204,8 +301,6 @@ export default function Home() {
     () => questions.filter((question) => question.layer === activeLayer && (activeModality === "ALL" || question.modality === activeModality)),
     [activeLayer, activeModality],
   );
-
-  const currentLayer = layerById[activeLayer];
 
   const chooseLayer = (id: LayerId) => {
     setActiveLayer(id);
@@ -226,126 +321,49 @@ export default function Home() {
           <span className="mark" aria-hidden="true"><i /><i /><i /></span>
           <span>MuSP<span>—Bench</span></span>
         </a>
-        <nav aria-label="Primary navigation">
-          <a href="#map">Question map</a>
-          <a href="#explorer">Examples</a>
-          <a href="#anatomy">Anatomy</a>
+        <p>Musical Score–Performance Understanding Benchmark</p>
+        <nav aria-label="Research links">
+          <a href="#explorer">Question explorer</a>
+          <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">Dataset ↗</a>
         </nav>
-        <a className="header-link" href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">
-          Dataset <span aria-hidden="true">↗</span>
-        </a>
       </header>
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="kicker"><span>Human-authored benchmark</span><span>Score × performance</span></p>
-          <h1>Music understanding,<br /><em>one layer at a time.</em></h1>
+          <p className="kicker">MuSP-Bench · Research demo</p>
+          <h1>Can multimodal models understand how a score becomes a <em>performance?</em></h1>
           <p className="hero-lede">
-            Explore how 490 questions move from a single note to the shape, interpretation, and identity of a complete musical work.
+            MuSP-Bench evaluates analytical and interpretive reasoning across complete musical scores and their performances. Its human-authored questions ask models to read notation, hear performed choices, connect the two, and integrate evidence from a single event to an entire work.
           </p>
-          <div className="hero-actions">
-            <a className="primary-button" href="#map">Start with the first layer <span>↓</span></a>
-            <a className="text-link" href="#explorer">Browse real questions <span>→</span></a>
+          <div className="research-axes" aria-label="Benchmark annotation dimensions">
+            <span><b>Content</b> pitch → context</span>
+            <span><b>Modality</b> S · P · SP · S/P</span>
+            <span><b>Horizon</b> short → long</span>
+            <span><b>Action</b> identify → explain</span>
           </div>
-          <dl className="hero-stats" aria-label="Dataset summary">
-            <div><dt>490</dt><dd>questions</dd></div>
-            <div><dt>24</dt><dd>complete works</dd></div>
-            <div><dt>4</dt><dd>modality routes</dd></div>
-            <div><dt>10</dt><dd>content families</dd></div>
-          </dl>
+          <a className="primary-button" href="#explorer">Explore representative questions <span>↓</span></a>
         </div>
-
-        <div className="hero-stair" aria-label="Five levels of musical understanding">
-          <p className="stair-label">A question can climb</p>
-          {[...layers].reverse().map((layer, index) => (
-            <button
-              key={layer.id}
-              className={`stair stair-${index + 1}`}
-              style={{ "--step-color": layer.color } as React.CSSProperties}
-              onClick={() => { chooseLayer(layer.id); document.getElementById("map")?.scrollIntoView({ behavior: "smooth" }); }}
-            >
-              <span>{layer.number}</span>
-              <strong>{layer.title}</strong>
-              <small>{layer.short}</small>
-            </button>
-          ))}
-          <div className="stair-axis"><span>local evidence</span><span>whole-work understanding</span></div>
-        </div>
-      </section>
-
-      <section className="question-map section" id="map">
-        <div className="section-heading">
-          <div>
-            <p className="section-number">01 / THE QUESTION MAP</p>
-            <h2>Zoom out.<br /><em>The question changes.</em></h2>
+        <aside className="research-note">
+          <span>BENCHMARK SCOPE</span>
+          <p>Questions range from literal score reading to long-horizon judgments about phrasing, rubato, voicing, form, timbre, and expressive intent.</p>
+          <div className="score-performance-diagram">
+            <div><b>Score</b><small>structure & intent</small><i>𝄞 ♩ ♪ ♩ 𝄐</i></div>
+            <span>↔</span>
+            <div><b>Performance</b><small>realization & choice</small><i>▂▅▇▃▁▆▇▅▂</i></div>
           </div>
-          <p>Each layer keeps the details below it, then asks the model to connect more musical evidence across time and modality.</p>
-        </div>
-
-        <div className="map-layout">
-          <div className="layer-list" role="tablist" aria-label="Understanding layers">
-            {layers.map((layer) => (
-              <button
-                key={layer.id}
-                role="tab"
-                aria-selected={activeLayer === layer.id}
-                className={activeLayer === layer.id ? "active" : ""}
-                onClick={() => chooseLayer(layer.id)}
-                style={{ "--step-color": layer.color } as React.CSSProperties}
-              >
-                <span>{layer.number}</span>
-                <span><strong>{layer.title}</strong><small>{layer.short}</small></span>
-                <b aria-hidden="true">→</b>
-              </button>
-            ))}
-          </div>
-
-          <article className="layer-detail" style={{ "--step-color": currentLayer.color } as React.CSSProperties}>
-            <div className="detail-topline"><span>{currentLayer.number}</span><span>{currentLayer.eyebrow}</span></div>
-            <h3>{currentLayer.title}</h3>
-            <p>{currentLayer.description}</p>
-            <div className="concept-cloud">
-              {currentLayer.concepts.map((concept) => <span key={concept}>{concept}</span>)}
-            </div>
-            <div className="evidence-scale">
-              <div className="scale-track"><i /></div>
-              <span>Evidence footprint</span>
-              <strong>{currentLayer.evidence}</strong>
-            </div>
-            <p className="layer-prompt">At this layer, ask: <strong>“{currentLayer.short}”</strong></p>
-          </article>
-        </div>
-      </section>
-
-      <section className="modalities section" id="routes">
-        <div className="section-heading compact">
-          <div>
-            <p className="section-number">02 / FOUR ROUTES TO EVIDENCE</p>
-            <h2>The same music.<br /><em>Different ways of knowing.</em></h2>
-          </div>
-          <p>Modality describes the minimum evidence needed—not merely the files supplied to a model.</p>
-        </div>
-        <div className="modality-grid">
-          {modalities.map((item) => (
-            <article className={`modality-card modality-${item.id.replace("/", "-")}`} key={item.id}>
-              <div><span className="modality-code">{item.id}</span><span className="modality-count">{item.count} Q</span></div>
-              <h3>{item.label}</h3>
-              <p>{item.description}</p>
-              <button onClick={() => { chooseModality(item.id); document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" }); }}>
-                See examples <span>→</span>
-              </button>
-            </article>
-          ))}
-        </div>
+        </aside>
       </section>
 
       <section className="explorer section" id="explorer">
         <div className="section-heading compact">
           <div>
             <p className="section-number">03 / QUESTION EXPLORER</p>
-            <h2>See the benchmark<br /><em>in its own words.</em></h2>
+            <h2>Questions with their<br /><em>required evidence.</em></h2>
           </div>
-          <p>These are released MuSP-Bench questions, lightly typeset for reading. Select a layer and an evidence route to compare what changes.</p>
+          <div className="explorer-intro">
+            <p>Select a content level and modality. Open a question to inspect the score, listen to the performance, and see the expected answer contract.</p>
+            <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">View the full dataset on Hugging Face <span>↗</span></a>
+          </div>
         </div>
 
         <div className="filter-block">
@@ -354,7 +372,7 @@ export default function Home() {
             <div>
               {layers.map((layer) => (
                 <button key={layer.id} className={activeLayer === layer.id ? "active" : ""} onClick={() => chooseLayer(layer.id)}>
-                  <i style={{ background: layer.color }} />{layer.number} {layer.title}
+                  <i style={{ background: layer.color }} />{layer.title}
                 </button>
               ))}
             </div>
@@ -392,29 +410,20 @@ export default function Home() {
                 </button>
                 {open && (
                   <div className="question-detail">
-                    <div className="answer-contract">
-                      <p className="mini-label">Answer contract</p>
-                      <dl>
-                        <div><dt>Object</dt><dd>{question.answerType}</dd></div>
-                        <div><dt>Format</dt><dd>{question.answerFormat}</dd></div>
-                        <div><dt>Quantity</dt><dd>{question.answerQuantity}</dd></div>
-                      </dl>
-                      <div className="format-example"><span>Format example</span><code>{question.formatExample}</code></div>
-                      <p className="example-note">A response-shape example from the release—not this question’s ground-truth answer.</p>
-                    </div>
-                    <div className="evidence-panel">
-                      <p className="mini-label">Minimum evidence route</p>
-                      <h4>{modality.id} · {modality.label}</h4>
-                      <p>{modality.description}</p>
-                      <div className="asset-actions">
-                        {(question.modality === "S" || question.modality === "SP" || question.modality === "S/P") && (
-                          <a href={scoreUrl(question.piece)} target="_blank" rel="noreferrer">Open score <span>↗</span></a>
-                        )}
-                        {(question.modality === "P" || question.modality === "SP" || question.modality === "S/P") && (
-                          <audio controls preload="none" src={audioUrl(question.piece)} aria-label={`Performance audio for ${question.title}`} />
-                        )}
+                    <div className="question-metadata">
+                      <div className="route-description"><span>{modality.id}</span><p><strong>{modality.label}</strong>{modality.description}</p></div>
+                      <div className="answer-contract">
+                        <p className="mini-label">Answer contract</p>
+                        <dl>
+                          <div><dt>Object</dt><dd>{question.answerType}</dd></div>
+                          <div><dt>Format</dt><dd>{question.answerFormat}</dd></div>
+                          <div><dt>Quantity</dt><dd>{question.answerQuantity}</dd></div>
+                        </dl>
+                        <div className="format-example"><span>Format example</span><code>{question.formatExample}</code></div>
+                        <p className="example-note">Response-shape example from the release, not the ground-truth answer.</p>
                       </div>
                     </div>
+                    <Evidence question={question} />
                   </div>
                 )}
               </article>
@@ -429,58 +438,14 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="anatomy section" id="anatomy">
-        <div className="section-heading light compact">
-          <div>
-            <p className="section-number">04 / ANATOMY OF A QUESTION</p>
-            <h2>Difficulty is not<br /><em>a single ladder.</em></h2>
-          </div>
-          <p>Every MuSP-Bench question sits at the intersection of four independent decisions. Together, they explain why two questions about the same note can demand very different understanding.</p>
-        </div>
-
-        <div className="axis-grid">
-          <article><span>01</span><h3>Content</h3><p>What musical idea is being understood?</p><div>Pitch → Time → Realization → Melody → Harmony → Orchestration → Organization → Interpretation → Timbre → Context</div></article>
-          <article><span>02</span><h3>Modality</h3><p>Where does the minimum evidence live?</p><div>S · P · SP · S/P</div></article>
-          <article><span>03</span><h3>Horizon</h3><p>How far must evidence be integrated?</p><div>Short · Medium · Long · Any</div></article>
-          <article><span>04</span><h3>Action</h3><p>What must the reasoner do with it?</p><div>Identify · Localize · Quantify · Compare · Infer · Transcribe · Explain</div></article>
-        </div>
-
-        <div className="worked-example">
-          <div className="worked-label"><span>Worked reading</span><strong>Q193</strong></div>
-          <blockquote>“The A major passage concludes with a half cadence at what time?”</blockquote>
-          <div className="worked-path">
-            <div><span>Content</span><strong>Harmony</strong><small>recognize the cadence</small></div>
-            <i>+</i>
-            <div><span>Modality</span><strong>SP</strong><small>align score and audio</small></div>
-            <i>+</i>
-            <div><span>Horizon</span><strong>Passage</strong><small>track a modulation</small></div>
-            <i>+</i>
-            <div><span>Action</span><strong>Localize</strong><small>return a timestamp</small></div>
-          </div>
-        </div>
-      </section>
-
-      <section className="why section">
-        <div className="why-copy">
-          <p className="section-number">WHY THIS BENCHMARK</p>
-          <h2>A score is a plan.<br />A performance is <em>a choice.</em></h2>
-          <p>Musicians move continually between written structure and realized sound. MuSP-Bench asks whether multimodal models can do the same—not only name chords or notes, but follow a phrase, hear a structural turn, and explain how a performer shapes it.</p>
-          <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">Explore the complete dataset <span>↗</span></a>
-        </div>
-        <div className="translation-diagram" aria-label="Score to performance translation">
-          <div className="paper-panel"><span>THE SCORE</span><b>intent</b><div className="staff">𝄞 &nbsp; ♩ ♪ ♩ &nbsp; 𝄐</div><small>pitch · rhythm · harmony · structure</small></div>
-          <div className="translation-arrow"><span>realized as</span><i>→</i><span>understood through</span><i>←</i></div>
-          <div className="sound-panel"><span>THE PERFORMANCE</span><b>choice</b><div className="wave">▂▅▇▃▁▆▇▅▂▃▆▃▁</div><small>timing · phrasing · voicing · timbre</small></div>
-        </div>
-      </section>
-
       <footer>
         <div className="footer-mark"><span className="mark" aria-hidden="true"><i /><i /><i /></span><strong>MuSP—Bench</strong></div>
         <p>Musical Score–Performance Understanding Benchmark</p>
         <div>
           <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">Dataset ↗</a>
           <a href="https://huggingface.co/datasets/milan477/MuSP-Bench/blob/main/data/questions.csv" target="_blank" rel="noreferrer">Questions CSV ↗</a>
-          <a href="#top">Back to top ↑</a>
+          <a href="https://github.com/vaclisinc/MuSP-demo" target="_blank" rel="noreferrer">GitHub ↗</a>
+          <a href="#top">Top ↑</a>
         </div>
         <small>Question text, modality labels, and answer contracts are drawn from the released dataset. Layer and scope labels in this guided tour are editorial groupings for explanation.</small>
       </footer>
