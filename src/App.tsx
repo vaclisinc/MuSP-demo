@@ -443,7 +443,6 @@ export default function App() {
         <p>Musical Score–Performance Understanding Benchmark</p>
         <div>
           <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">Dataset ↗</a>
-          <a href="https://huggingface.co/datasets/milan477/MuSP-Bench/blob/main/data/questions.csv" target="_blank" rel="noreferrer">Questions CSV ↗</a>
           <a href="https://github.com/vaclisinc/MuSP-demo" target="_blank" rel="noreferrer">GitHub ↗</a>
           <a href="#top">Top ↑</a>
         </div>
