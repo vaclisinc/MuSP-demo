@@ -1,196 +1,119 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 type Modality = "S" | "P" | "SP" | "S/P";
-type LayerId = "signal" | "time" | "language" | "structure" | "meaning";
+type Topic = "sound" | "time" | "relations" | "form" | "meaning";
 
 type Question = {
   id: string;
-  layer: LayerId;
-  scope: "Local" | "Passage" | "Whole work";
-  modality: Modality;
+  pieceNumber: string;
   composer: string;
   title: string;
-  question: string;
-  answerType: string;
+  modality: Modality;
+  fullQuestion: string;
+  answerObjectType: string;
   answerFormat: string;
   answerQuantity: string;
-  formatExample: string;
-  piece: string;
+  answerExample: string;
+  cleanedReorganizedScoreFilename: string;
+  audioFilename: string;
+  topic: Topic;
 };
 
+type RollNote = { t: number; d: number; p: number; v: number };
+type RollData = Record<string, { source: string; notes: RollNote[] }>;
+
+const BASE = import.meta.env.BASE_URL;
 const HF_ROOT = "https://huggingface.co/datasets/milan477/MuSP-Bench/resolve/main";
+const DATASET_URL = "https://huggingface.co/datasets/milan477/MuSP-Bench";
 
-const layers: Array<{
-  id: LayerId;
-  number: string;
-  eyebrow: string;
-  title: string;
-  short: string;
-  description: string;
-  concepts: string[];
-  evidence: string;
-  color: string;
-}> = [
-  {
-    id: "signal",
-    number: "01",
-    eyebrow: "The musical atoms",
-    title: "Pitch & sound",
-    short: "What is there?",
-    description: "Begin with the smallest perceptible or notated units: pitch identity, register, spelling, and timbral color.",
-    concepts: ["Pitch", "Register", "Accidentals", "Timbre"],
-    evidence: "A note, sonority, or brief instant",
-    color: "var(--coral)",
-  },
-  {
-    id: "time",
-    number: "02",
-    eyebrow: "Events become gestures",
-    title: "Time & realization",
-    short: "How is it played?",
-    description: "Notes gain duration, pulse, articulation, dynamics, ornament, and performed timing. The score and the sounding result may now diverge.",
-    concepts: ["Rhythm", "Meter", "Tempo", "Articulation", "Dynamics"],
-    evidence: "A beat, bar, or a few seconds",
-    color: "var(--amber)",
-  },
-  {
-    id: "language",
-    number: "03",
-    eyebrow: "Relations create syntax",
-    title: "Musical language",
-    short: "How do events relate?",
-    description: "Individual events connect horizontally and vertically—as melody, harmony, voicing, counterpoint, and orchestration.",
-    concepts: ["Melody", "Harmony", "Voicing", "Counterpoint", "Orchestration"],
-    evidence: "Several bars or an instrumental exchange",
-    color: "var(--leaf)",
-  },
-  {
-    id: "structure",
-    number: "04",
-    eyebrow: "Memory across distance",
-    title: "Form & organization",
-    short: "How does it unfold?",
-    description: "The listener must connect distant evidence: repetition, variation, themes, phrases, sections, development, and large-scale form.",
-    concepts: ["Theme", "Phrasing", "Variation", "Segmentation", "Form"],
-    evidence: "A section, non-contiguous spans, or the full work",
-    color: "var(--blue)",
-  },
-  {
-    id: "meaning",
-    number: "05",
-    eyebrow: "From structure to understanding",
-    title: "Interpretation & context",
-    short: "What does it mean?",
-    description: "The highest layer asks what a realization communicates—and what the music reveals about character, style, identity, and artistic intent.",
-    concepts: ["Character", "Emotion", "Expressive intent", "Style", "Context"],
-    evidence: "Integrated score, performance, and musical knowledge",
-    color: "var(--violet)",
-  },
-];
+const modalityOrder: Modality[] = ["P", "SP", "S/P", "S"];
+const modalityMeta: Record<Modality, { label: string; short: string; description: string }> = {
+  P: { label: "Performance", short: "Hear", description: "The sounding performance contains the required evidence." },
+  SP: { label: "Score ↔ performance", short: "Compare", description: "Answer by relating notation to its realization." },
+  "S/P": { label: "Either route", short: "Choose", description: "Score or performance can independently support the answer." },
+  S: { label: "Score", short: "Read", description: "The written score contains the required evidence." },
+};
 
-const modalities: Array<{ id: Modality; label: string; description: string; count: number }> = [
-  { id: "S", label: "Score", description: "The written score alone contains the minimum evidence.", count: 180 },
-  { id: "P", label: "Performance", description: "The sounding performance alone is required.", count: 106 },
-  { id: "SP", label: "Score + performance", description: "The question depends on relating notation to its realization.", count: 72 },
-  { id: "S/P", label: "Either route", description: "Score or performance can independently support an answer.", count: 132 },
-];
+const topicMeta: Record<Topic, string> = {
+  sound: "Pitch & sound",
+  time: "Time & realization",
+  relations: "Musical relations",
+  form: "Form & memory",
+  meaning: "Interpretation",
+};
 
-const questions: Question[] = [
-  {
-    id: "Q2", layer: "signal", scope: "Local", modality: "S", composer: "Bach", title: "Fugue BWV 875",
-    question: "What is the largest interval between two consecutive notes in the soprano voice of bars 3–4?",
-    answerType: "Interval", answerFormat: "Interval quality and size", answerQuantity: "Single",
-    formatExample: "perfect fifth", piece: "01",
-  },
-  {
-    id: "Q184", layer: "signal", scope: "Local", modality: "P", composer: "Bach", title: "Prelude BWV 848",
-    question: "Between 00:16 and 00:19, the performer brings out two melodic lines in two different registers. What is the highest note within the lowest of the two emphasized melodies?",
-    answerType: "Pitch", answerFormat: "Pitch with octave number", answerQuantity: "Single",
-    formatExample: "G♯3", piece: "02",
-  },
-  {
-    id: "Q186", layer: "time", scope: "Passage", modality: "P", composer: "Bach", title: "Prelude BWV 848",
-    question: "Listen to the performance and feel the pulse given by the slower-moving voice in the opening. Which BPM range best matches the tempo?",
-    answerType: "Choice", answerFormat: "One choice copied exactly from the question", answerQuantity: "Single",
-    formatExample: "50–60", piece: "02",
-  },
-  {
-    id: "Q254", layer: "time", scope: "Local", modality: "SP", composer: "Bach", title: "Fugue BWV 875",
-    question: "The performer plays bars 1–2 with different articulation: sometimes legato, sometimes staccato. Which eighth notes are played staccato?",
-    answerType: "Pitch", answerFormat: "Pitch with octave number", answerQuantity: "List ordered by appearance",
-    formatExample: "A2, C♯3, E♭4", piece: "01",
-  },
-  {
-    id: "Q198", layer: "language", scope: "Local", modality: "P", composer: "Beethoven", title: "Symphony No. 2, movement 3",
-    question: "Which instrument plays the main melody, 0:11 onwards?",
-    answerType: "Short text", answerFormat: "Instrument name", answerQuantity: "Single",
-    formatExample: "Piano", piece: "20",
-  },
-  {
-    id: "Q193", layer: "language", scope: "Passage", modality: "SP", composer: "Beethoven", title: "Piano Sonata No. 21, movement 1",
-    question: "In the re-exposition, after the theme recurs in diminution, the piece briefly modulates to A major. The A major passage concludes with a half cadence at what time?",
-    answerType: "Timestamp", answerFormat: "M:SS or MM:SS, rounded down", answerQuantity: "Single",
-    formatExample: "02:54", piece: "05",
-  },
-  {
-    id: "Q325", layer: "language", scope: "Passage", modality: "S/P", composer: "Bach", title: "Fugue BWV 875",
-    question: "After the secondary sixteenth-note motif is first presented as A4–B♭4–A4–G4–B♭4–A4–G4–F♯4, what are the first notes of its next three appearances?",
-    answerType: "Pitch", answerFormat: "Pitch with octave number", answerQuantity: "List ordered by appearance",
-    formatExample: "A4, G♯3, B♭2", piece: "01",
-  },
-  {
-    id: "Q188", layer: "structure", scope: "Passage", modality: "P", composer: "Balakirev", title: "Islamey",
-    question: "The passage beginning at 0:21 forms a distinct section through its repeated melodic pattern and texture. Until what time does the music remain recognizably within that same pattern and texture?",
-    answerType: "Timestamp", answerFormat: "M:SS or MM:SS, rounded down", answerQuantity: "Single",
-    formatExample: "02:54", piece: "03",
-  },
-  {
-    id: "Q263", layer: "structure", scope: "Whole work", modality: "SP", composer: "Balakirev", title: "Islamey",
-    question: "The first part concludes at 2:04. Up until there, how many times in total were bars 1–2 played or varied, counting a variation only when the full two-bar passage and essential melody remain?",
-    answerType: "Integer", answerFormat: "Positive integer", answerQuantity: "Single",
-    formatExample: "4", piece: "03",
-  },
-  {
-    id: "Q334", layer: "structure", scope: "Whole work", modality: "S/P", composer: "Beethoven", title: "Piano Sonata No. 23, movement 1",
-    question: "The coda, which starts in bar 203, reviews the two main themes: in what order? Consider a theme evoked when it is played or varied for at least four bars.",
-    answerType: "Integer", answerFormat: "Positive integer", answerQuantity: "List ordered by appearance",
-    formatExample: "1, 1, 1, 2", piece: "04",
-  },
-  {
-    id: "Q183", layer: "meaning", scope: "Passage", modality: "P", composer: "Bach", title: "Fugue BWV 875",
-    question: "Between 1:26 and 1:39, the performer uses an unusual rubato. Which note carries the greatest expressive tension, receiving the strongest dramatic and interpretive emphasis?",
-    answerType: "Pitch", answerFormat: "Pitch class without octave number", answerQuantity: "Single",
-    formatExample: "A", piece: "01",
-  },
-  {
-    id: "Q330", layer: "meaning", scope: "Passage", modality: "S/P", composer: "Beethoven", title: "Piano Sonata No. 23, movement 1",
-    question: "When the first theme is played for the second time in a different texture, what emotion likely best describes the new nuance the composer and performer bring to it?",
-    answerType: "Choice", answerFormat: "One choice copied exactly from the question", answerQuantity: "Single",
-    formatExample: "Not supplied in release", piece: "04",
-  },
-  {
-    id: "Q360", layer: "meaning", scope: "Whole work", modality: "S/P", composer: "Scriabin", title: "Etude Op. 8 No. 11",
-    question: "What is the main source of challenge for the pianist in this piece: polyphonic texture, complex polyrhythms, emotional depth, virtuosic arpeggios, large leaps, hand synchronization, or rapid scales?",
-    answerType: "Choice", answerFormat: "One choice copied exactly from the question", answerQuantity: "Single",
-    formatExample: "Not supplied in release", piece: "17",
-  },
-  {
-    id: "Q362", layer: "meaning", scope: "Whole work", modality: "S/P", composer: "Bach", title: "Fugue BWV 875",
-    question: "What is the title of this work?",
-    answerType: "Short text", answerFormat: "Short phrase", answerQuantity: "Single",
-    formatExample: "Waltz in E major, Op. 39 No. 5", piece: "01",
-  },
-];
+const portraitByComposer: Record<string, string> = {
+  Bach: `${BASE}images/composer-bach.webp`,
+  Beethoven: `${BASE}images/composer-beethoven.webp`,
+  Debussy: `${BASE}images/composer-debussy.webp`,
+};
 
-const modalityById = Object.fromEntries(modalities.map((item) => [item.id, item])) as Record<Modality, (typeof modalities)[number]>;
-
-function scoreUrl(piece: string) {
-  return `${HF_ROOT}/scores/cleaned_reorganized/piece-${piece}.pdf`;
+function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
+  return <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">{children}</svg>;
 }
 
-function audioUrl(piece: string) {
-  return `${HF_ROOT}/audio/piece-${piece}.mp3`;
+function ArrowIcon() {
+  return <Icon><path d="M5 12h13M14 7l5 5-5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></Icon>;
+}
+
+function PlayIcon({ playing }: { playing: boolean }) {
+  return playing
+    ? <Icon size={22}><path d="M8 6v12M16 6v12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></Icon>
+    : <Icon size={22}><path d="m9 6 9 6-9 6V6Z" fill="currentColor" /></Icon>;
+}
+
+function parseCSV(input: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (quoted) {
+      if (character === '"' && input[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (character === '"') quoted = false;
+      else field += character;
+    } else if (character === '"') quoted = true;
+    else if (character === ",") {
+      row.push(field);
+      field = "";
+    } else if (character === "\n") {
+      row.push(field.replace(/\r$/, ""));
+      rows.push(row);
+      row = [];
+      field = "";
+    } else field += character;
+  }
+  if (field || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function deriveTopic(question: string, objectType: string): Topic {
+  const text = `${question} ${objectType}`.toLowerCase();
+  if (/emotion|expressive|character|style|challenge|interpret|mood|tension|identity|title of/.test(text)) return "meaning";
+  if (/form|theme|section|coda|exposition|reprise|recapit|phrase|motif|variation|whole piece|part concludes/.test(text)) return "form";
+  if (/tempo|bpm|rhythm|meter|duration|timing|rubato|articulation|dynamic|pulse|beat|onset|rest|silence/.test(text)) return "time";
+  if (/melod|harmony|chord|cadence|instrument|orchestrat|voice|counterpoint|texture|tonality|key signature/.test(text)) return "relations";
+  return "sound";
+}
+
+function parseQuestions(csv: string): Question[] {
+  const [headers, ...rows] = parseCSV(csv);
+  return rows.filter((row) => row.length === headers.length).map((row) => {
+    const record = Object.fromEntries(headers.map((header, index) => [header, row[index]]));
+    return {
+      ...record,
+      pieceNumber: record.pieceNumber.padStart(2, "0"),
+      modality: record.modality as Modality,
+      topic: deriveTopic(record.fullQuestion, record.answerObjectType),
+    } as Question;
+  });
 }
 
 function formatTime(value: number) {
@@ -200,258 +123,344 @@ function formatTime(value: number) {
   return `${minutes}:${seconds}`;
 }
 
-function AudioPlayer({ piece, title }: { piece: string; title: string }) {
+function resourceUrl(path: string) {
+  return `${HF_ROOT}/${path}`;
+}
+
+function Portrait({ composer, className = "" }: { composer: string; className?: string }) {
+  const source = portraitByComposer[composer];
+  return source
+    ? <img className={className} src={source} alt={`${composer} portrait`} />
+    : <span className={`${className} portrait-fallback`} aria-label={`${composer} portrait unavailable`}>{composer.slice(0, 1)}</span>;
+}
+
+function Hero({ onExplore }: { onExplore: () => void }) {
+  return (
+    <section className="hero" id="top">
+      <div className="hero-score" aria-label="Composers represented in MuSP-Bench">
+        <div className="score-paper" aria-hidden="true">
+          <span>𝄞</span><i /><i /><i /><i /><i />
+        </div>
+        <div className="portrait portrait-bach"><Portrait composer="Bach" /><small>J. S. Bach</small></div>
+        <div className="portrait portrait-beethoven"><Portrait composer="Beethoven" /><small>Beethoven</small></div>
+        <div className="portrait portrait-debussy"><Portrait composer="Debussy" /><small>Debussy</small></div>
+        <p>COMPOSED<br />EVIDENCE</p>
+      </div>
+
+      <div className="hero-performance" style={{ "--pianist": `url(${BASE}images/pianist-performance.webp)` } as CSSProperties}>
+        <p>PERFORMED<br />EVIDENCE</p>
+        <div className="performance-meter" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} />)}</div>
+      </div>
+
+      <div className="hero-center">
+        <div className="hero-title">
+          <span className="hero-mark" aria-hidden="true"><i /><i /><i /></span>
+          <h1>MuSP<span>—Bench</span></h1>
+          <p>Musical score–performance understanding, measured across what is written, what is heard, and what changes between them.</p>
+          <div className="hero-actions">
+            <button className="button button-primary" onClick={onExplore}>Enter the benchmark <ArrowIcon /></button>
+            <a className="button button-quiet" href={DATASET_URL} target="_blank" rel="noreferrer">Hugging Face <span>↗</span></a>
+            <a className="button button-quiet" href={`${BASE}paper/MuSP_Bench.pdf`} target="_blank" rel="noreferrer">Paper <span>↗</span></a>
+          </div>
+        </div>
+        <div className="hero-axis" aria-hidden="true"><span>SCORE</span><i /><span>PERFORMANCE</span></div>
+      </div>
+      <button className="hero-scroll" onClick={onExplore}><span>Explore all 520 questions</span><i /></button>
+    </section>
+  );
+}
+
+function PianoRoll({ piece, roll, progress }: { piece: string; roll?: RollData[string]; progress: number }) {
+  const [zoom, setZoom] = useState(1);
+  const notes = roll?.notes ?? [];
+  const windowStart = Math.max(0, Math.min(88, progress * 96 - 8 / zoom));
+  const windowLength = 24 / zoom;
+  const visible = notes.filter((note) => note.t + note.d >= windowStart && note.t <= windowStart + windowLength);
+  return (
+    <div className="piano-roll-tool">
+      <div className="tool-heading">
+        <span>PIANO-ROLL LENS</span>
+        <label>Zoom <input type="range" min="0.7" max="2.3" step="0.1" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>
+      </div>
+      {roll ? (
+        <div className="piano-roll" aria-label={`Score-derived piano roll for piece ${piece}`}>
+          <div className="roll-keys" aria-hidden="true">{["C6", "C5", "C4", "C3"].map((key) => <span key={key}>{key}</span>)}</div>
+          <div className="roll-stage">
+            {visible.map((note, index) => (
+              <i key={`${note.t}-${note.p}-${index}`} style={{
+                "--x": `${((note.t - windowStart) / windowLength) * 100}%`,
+                "--w": `${Math.max(0.35, (note.d / windowLength) * 100)}%`,
+                "--y": `${(1 - Math.min(1, Math.max(0, (note.p - 36) / 60))) * 100}%`,
+                "--voice": note.v % 4,
+              } as CSSProperties} />
+            ))}
+            <b style={{ left: `${Math.min(100, Math.max(0, ((progress * 96 - windowStart) / windowLength) * 100))}%` }} />
+          </div>
+        </div>
+      ) : <div className="tool-unavailable">A score-derived piano-roll preview is not available for this orchestral item.</div>}
+      <p>Score-derived preview. The playhead follows performance proportionally; it is not a score–audio alignment.</p>
+    </div>
+  );
+}
+
+function EvidenceLab({ question, roll }: { question: Question; roll?: RollData[string] }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [taps, setTaps] = useState<number[]>([]);
+  const hasScore = question.modality !== "P";
+  const hasAudio = question.modality !== "S";
 
   useEffect(() => {
     setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [piece]);
+    setTaps([]);
+  }, [question.id]);
+
+  const tapBpm = useMemo(() => {
+    if (taps.length < 2) return null;
+    const gaps = taps.slice(1).map((tap, index) => tap - taps[index]);
+    return Math.round(60000 / (gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length));
+  }, [taps]);
+
+  const registerTap = () => {
+    const now = performance.now();
+    setTaps((previous) => [...(previous.filter((tap) => now - tap < 3500).slice(-5)), now]);
+  };
 
   const toggle = async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.paused) await audio.play();
-    else audio.pause();
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) await audioRef.current.play();
+    else audioRef.current.pause();
   };
 
   return (
-    <div className="audio-player">
-      <audio
-        ref={audioRef}
-        src={audioUrl(piece)}
-        preload="metadata"
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
-      />
-      <div className="audio-heading">
-        <span>PERFORMANCE AUDIO</span>
-        <a href={audioUrl(piece)} target="_blank" rel="noreferrer">source ↗</a>
-      </div>
-      <div className="audio-main">
-        <button className="play-button" onClick={toggle} aria-label={playing ? `Pause ${title}` : `Play ${title}`}>
-          {playing ? <span className="pause-icon"><i /><i /></span> : <span className="play-icon" />}
-        </button>
-        <div className="audio-track">
-          <strong>{title}</strong>
-          <div className="timeline">
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              step="0.1"
-              value={Math.min(currentTime, duration || 0)}
-              aria-label="Audio position"
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                if (audioRef.current) audioRef.current.currentTime = next;
-                setCurrentTime(next);
-              }}
-              style={{ "--progress": `${duration ? (currentTime / duration) * 100 : 0}%` } as CSSProperties}
-            />
-            <div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
+    <div className="evidence-lab">
+      {hasAudio && (
+        <div className="performance-deck">
+          <audio
+            ref={audioRef}
+            src={resourceUrl(question.audioFilename)}
+            preload="metadata"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+            onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+          />
+          <div className="deck-top"><span>PERFORMANCE / {question.pieceNumber}</span><a href={resourceUrl(question.audioFilename)} target="_blank" rel="noreferrer">audio source ↗</a></div>
+          <div className="transport">
+            <button className="play-button" onClick={toggle} aria-label={playing ? "Pause performance" : "Play performance"}><PlayIcon playing={playing} /></button>
+            <div className="track">
+              <strong>{question.composer}</strong><span>{question.title}</span>
+              <input
+                className="timeline"
+                type="range"
+                min="0"
+                max={duration || 0}
+                step="0.1"
+                value={Math.min(currentTime, duration || 0)}
+                aria-label="Performance position"
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  if (audioRef.current) audioRef.current.currentTime = next;
+                  setCurrentTime(next);
+                }}
+                style={{ "--progress": `${duration ? (currentTime / duration) * 100 : 0}%` } as CSSProperties}
+              />
+              <div className="time"><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
+            </div>
           </div>
+          <div className="mir-controls">
+            <label>Playback speed
+              <select value={speed} onChange={(event) => {
+                const value = Number(event.target.value);
+                setSpeed(value);
+                if (audioRef.current) audioRef.current.playbackRate = value;
+              }}>
+                {[0.5, 0.75, 1, 1.25].map((value) => <option key={value} value={value}>{value}×</option>)}
+              </select>
+            </label>
+            <button className="tap-button" onClick={registerTap}><span>{tapBpm ? `${tapBpm}` : "TAP"}</span><small>{tapBpm ? "estimated BPM" : "tap the pulse"}</small></button>
+          </div>
+          <PianoRoll piece={question.pieceNumber} roll={roll} progress={duration ? currentTime / duration : 0} />
         </div>
-      </div>
+      )}
+
+      {hasScore && (
+        <div className="score-viewer">
+          <div className="deck-top"><span>SCORE / {question.pieceNumber}</span><a href={resourceUrl(question.cleanedReorganizedScoreFilename)} target="_blank" rel="noreferrer">open full score ↗</a></div>
+          <iframe src={`${resourceUrl(question.cleanedReorganizedScoreFilename)}#page=1&view=FitH`} title={`Score for ${question.title}`} loading="lazy" />
+        </div>
+      )}
     </div>
   );
 }
 
-function ScoreViewer({ piece, title }: { piece: string; title: string }) {
-  const url = scoreUrl(piece);
+function QuestionDetail({ question }: { question: Question }) {
+  const example = question.answerExample.replace(/^\["?|"?\]$/g, "").replace(/""/g, '"');
   return (
-    <div className="score-viewer">
-      <div className="viewer-heading">
-        <span>SCORE PDF</span>
-        <a href={url} target="_blank" rel="noreferrer">open full score ↗</a>
+    <article className="question-detail">
+      <div className="detail-piece">
+        <Portrait composer={question.composer} className="detail-portrait" />
+        <div><span>{question.id} · PIECE {question.pieceNumber}</span><strong>{question.composer}</strong><small>{question.title}</small></div>
       </div>
-      <iframe src={`${url}#page=1&view=FitH`} title={`Score for ${title}`} loading="lazy" />
-      <p>If the embedded viewer is unavailable in your browser, <a href={url} target="_blank" rel="noreferrer">open the PDF directly</a>.</p>
-    </div>
-  );
-}
-
-function Evidence({ question }: { question: Question }) {
-  const hasScore = question.modality === "S" || question.modality === "SP" || question.modality === "S/P";
-  const hasAudio = question.modality === "P" || question.modality === "SP" || question.modality === "S/P";
-  return (
-    <div className={`evidence-workbench ${hasScore && hasAudio ? "both" : ""} ${hasScore ? "has-score" : "audio-only"}`}>
-      {hasScore && <ScoreViewer piece={question.piece} title={question.title} />}
-      {hasAudio && <AudioPlayer piece={question.piece} title={`${question.composer} — ${question.title}`} />}
-    </div>
+      <div className={`modality-badge modality-${question.modality.replace("/", "-")}`}><b>{question.modality}</b><span>{modalityMeta[question.modality].label}</span></div>
+      <h3>{question.fullQuestion}</h3>
+      <p className="route-copy">{modalityMeta[question.modality].description}</p>
+      <div className="answer-contract">
+        <dl>
+          <div><dt>Answer object</dt><dd>{question.answerObjectType}</dd></div>
+          <div><dt>Required format</dt><dd>{question.answerFormat}</dd></div>
+          <div><dt>Quantity</dt><dd>{question.answerQuantity}</dd></div>
+        </dl>
+        <p><span>Response-shape examples</span><code>{example}</code><small>Examples of form only, not the answer.</small></p>
+      </div>
+    </article>
   );
 }
 
 export default function App() {
-  const [activeLayer, setActiveLayer] = useState<LayerId>("signal");
-  const [activeModality, setActiveModality] = useState<Modality | "ALL">("ALL");
-  const [selectedQuestionId, setSelectedQuestionId] = useState<string>("Q2");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [rolls, setRolls] = useState<RollData>({});
+  const [loadingError, setLoadingError] = useState("");
+  const [activeModality, setActiveModality] = useState<Modality | "ALL">("P");
+  const [activeTopic, setActiveTopic] = useState<Topic | "ALL">("ALL");
+  const [activeComposer, setActiveComposer] = useState("ALL");
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [visibleCount, setVisibleCount] = useState(36);
 
-  const filteredQuestions = useMemo(
-    () => questions.filter((question) => question.layer === activeLayer && (activeModality === "ALL" || question.modality === activeModality)),
-    [activeLayer, activeModality],
-  );
-  const selectedQuestion = filteredQuestions.find((question) => question.id === selectedQuestionId) ?? filteredQuestions[0];
+  useEffect(() => {
+    Promise.all([
+      fetch(`${BASE}data/questions.csv`).then((response) => {
+        if (!response.ok) throw new Error("The benchmark question file could not be loaded.");
+        return response.text();
+      }),
+      fetch(`${BASE}data/piano-roll.json`).then((response) => response.json() as Promise<RollData>),
+    ]).then(([csv, rollData]) => {
+      const parsed = parseQuestions(csv);
+      setQuestions(parsed);
+      setRolls(rollData);
+      setSelectedId(parsed.find((question) => question.id === "Q183")?.id ?? parsed.find((question) => question.modality === "P")?.id ?? parsed[0]?.id ?? "");
+    }).catch((error: Error) => setLoadingError(error.message));
+  }, []);
 
-  const chooseLayer = (id: LayerId) => {
-    setActiveLayer(id);
-    const first = questions.find((question) => question.layer === id && (activeModality === "ALL" || question.modality === activeModality));
-    setSelectedQuestionId(first?.id ?? "");
+  const composers = useMemo(() => [...new Set(questions.map((question) => question.composer))].sort(), [questions]);
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return questions.filter((question) =>
+      (activeModality === "ALL" || question.modality === activeModality)
+      && (activeTopic === "ALL" || question.topic === activeTopic)
+      && (activeComposer === "ALL" || question.composer === activeComposer)
+      && (!needle || `${question.id} ${question.composer} ${question.title} ${question.fullQuestion}`.toLowerCase().includes(needle)),
+    );
+  }, [questions, activeComposer, activeModality, activeTopic, query]);
+
+  const selected = filtered.find((question) => question.id === selectedId) ?? filtered[0];
+
+  const chooseQuestion = (question: Question) => {
+    setSelectedId(question.id);
+    document.getElementById("evidence")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const chooseModality = (id: Modality | "ALL") => {
-    setActiveModality(id);
-    const first = questions.find((question) => question.layer === activeLayer && (id === "ALL" || question.modality === id));
-    setSelectedQuestionId(first?.id ?? "");
+  const updateFilter = (callback: () => void) => {
+    callback();
+    setVisibleCount(36);
   };
+
+  const scrollToExplorer = () => document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <main>
       <header className="site-header">
-        <a className="wordmark" href="#top" aria-label="MuSP-Bench home">
-          <span className="mark" aria-hidden="true"><i /><i /><i /></span>
-          <span>MuSP<span>—Bench</span></span>
-        </a>
-        <p>Musical Score–Performance Understanding Benchmark</p>
+        <a className="wordmark" href="#top"><span className="mini-mark"><i /><i /><i /></span><strong>MuSP<span>—Bench</span></strong></a>
+        <p>Score meets performance.</p>
         <nav aria-label="Research links">
-          <a href="#explorer">Question explorer</a>
-          <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">Dataset ↗</a>
+          <a href="#explorer">Questions</a>
+          <a href={DATASET_URL} target="_blank" rel="noreferrer">Dataset ↗</a>
+          <a href={`${BASE}paper/MuSP_Bench.pdf`} target="_blank" rel="noreferrer">Paper ↗</a>
         </nav>
       </header>
 
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="kicker">MuSP-Bench · Research demo</p>
-          <h1>A benchmark for musical score–performance <em>understanding.</em></h1>
-          <p className="hero-lede">
-            Human-authored questions spanning score reading, performance listening, and reasoning across both.
-          </p>
-          <a className="primary-button" href="#explorer">Explore representative questions <span>↓</span></a>
+      <Hero onExplore={scrollToExplorer} />
+
+      <section className="route-stage" aria-label="Benchmark evidence routes">
+        <div className="route-copy-block">
+          <h2>Begin with the <em>performance.</em></h2>
+          <p>The most immediate way into MuSP-Bench is to listen. Then open the score, or ask what becomes visible only when the two are compared.</p>
         </div>
-        <div className="hero-stair" aria-label="Question hierarchy from local evidence to whole-work understanding">
-          <p className="stair-label">From musical detail to whole-work understanding</p>
-          {[...layers].reverse().map((layer, index) => (
-            <button
-              key={layer.id}
-              className={`stair stair-${index + 1}`}
-              style={{ "--step-color": layer.color } as CSSProperties}
-              onClick={() => { chooseLayer(layer.id); document.getElementById("explorer")?.scrollIntoView({ behavior: "smooth" }); }}
-            >
-              <span>{layer.number}</span>
-              <strong>{layer.title}</strong>
-              <small>{layer.short}</small>
+        <div className="route-switcher">
+          {modalityOrder.map((modality) => (
+            <button key={modality} onClick={() => { setActiveModality(modality); scrollToExplorer(); }}>
+              <span>{modality}</span><strong>{modalityMeta[modality].label}</strong><small>{modalityMeta[modality].short}</small><ArrowIcon />
             </button>
           ))}
-          <div className="stair-axis"><span>local evidence</span><span>global reasoning</span></div>
         </div>
       </section>
 
-      <section className="explorer section" id="explorer">
-        <div className="section-heading compact">
-          <div>
-            <p className="section-number">QUESTION EXPLORER</p>
-            <h2>Read the question.<br /><em>Inspect the evidence.</em></h2>
-          </div>
-          <div className="explorer-intro">
-            <p>Select a question on the left. Its score or performance stays visible on the right.</p>
-            <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">View the full dataset on Hugging Face <span>↗</span></a>
-          </div>
+      <section className="explorer" id="explorer">
+        <div className="explorer-heading">
+          <h2>The full question set,<br /><em>ready to inspect.</em></h2>
+          <div><strong>{questions.length || "—"}</strong><span>released questions<br />24 musical works</span></div>
         </div>
 
-        <div className="filter-block">
-          <div className="filter-row">
-            <span>Layer</span>
-            <div>
-              {layers.map((layer) => (
-                <button key={layer.id} className={activeLayer === layer.id ? "active" : ""} onClick={() => chooseLayer(layer.id)}>
-                  <i style={{ background: layer.color }} />{layer.title}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="filter-row">
+        <div className="filter-console">
+          <div className="filter-group route-filter">
             <span>Evidence</span>
-            <div>
-              <button className={activeModality === "ALL" ? "active" : ""} onClick={() => chooseModality("ALL")}>All routes</button>
-              {modalities.map((item) => (
-                <button key={item.id} className={activeModality === item.id ? "active" : ""} onClick={() => chooseModality(item.id)}>{item.id} · {item.label}</button>
-              ))}
-            </div>
+            <button className={activeModality === "ALL" ? "active" : ""} onClick={() => updateFilter(() => setActiveModality("ALL"))}>All</button>
+            {modalityOrder.map((modality) => <button key={modality} className={activeModality === modality ? "active" : ""} onClick={() => updateFilter(() => setActiveModality(modality))}>{modalityMeta[modality].label}</button>)}
           </div>
+          <div className="filter-group">
+            <span>Editorial lens</span>
+            <button className={activeTopic === "ALL" ? "active" : ""} onClick={() => updateFilter(() => setActiveTopic("ALL"))}>All</button>
+            {(Object.keys(topicMeta) as Topic[]).map((topic) => <button key={topic} className={activeTopic === topic ? "active" : ""} onClick={() => updateFilter(() => setActiveTopic(topic))}>{topicMeta[topic]}</button>)}
+          </div>
+          <div className="filter-fields">
+            <label><span>Composer</span><select value={activeComposer} onChange={(event) => updateFilter(() => setActiveComposer(event.target.value))}><option value="ALL">All composers</option>{composers.map((composer) => <option key={composer}>{composer}</option>)}</select></label>
+            <label className="search-field"><span>Search</span><input value={query} onChange={(event) => updateFilter(() => setQuery(event.target.value))} placeholder="Question, work, ID…" /></label>
+          </div>
+          <p className="annotation-note">Musical lenses are editorial navigation aids, not canonical dataset annotations.</p>
         </div>
 
-        {selectedQuestion ? (
-          <div className="explorer-workspace">
-            <div className="question-pane">
-              <div className="results-topline">
-                <span>{filteredQuestions.length} example{filteredQuestions.length === 1 ? "" : "s"}</span>
-                <span>Select a question</span>
-              </div>
-              <div className="question-index">
-                {filteredQuestions.map((question) => (
-                  <button
-                    key={question.id}
-                    className={selectedQuestion.id === question.id ? "active" : ""}
-                    onClick={() => setSelectedQuestionId(question.id)}
-                    aria-pressed={selectedQuestion.id === question.id}
-                  >
-                    <span className={`route route-${question.modality.replace("/", "-")}`}>{question.modality}</span>
-                    <span><small>{question.id} · {question.composer}</small><strong>{question.question}</strong></span>
+        {loadingError ? <div className="load-state error"><strong>Questions unavailable.</strong><p>{loadingError} Refresh the page or use the Hugging Face dataset directly.</p><a href={DATASET_URL}>Open dataset ↗</a></div>
+          : !questions.length ? <div className="load-state"><span className="loading-disc" /><strong>Loading the full benchmark…</strong></div>
+          : filtered.length ? (
+            <>
+              <div className="result-line"><span>{filtered.length} matching questions</span><span>Performance routes appear first by default</span></div>
+              <div className="question-grid">
+                {filtered.slice(0, visibleCount).map((question) => (
+                  <button className={`question-row ${selected?.id === question.id ? "active" : ""}`} key={question.id} onClick={() => chooseQuestion(question)}>
+                    <Portrait composer={question.composer} className="row-portrait" />
+                    <span className={`row-route modality-${question.modality.replace("/", "-")}`}>{question.modality}</span>
+                    <span className="row-copy"><small>{question.id} · {question.composer} · {question.title}</small><strong>{question.fullQuestion}</strong></span>
+                    <span className="row-topic">{topicMeta[question.topic]}</span>
+                    <ArrowIcon />
                   </button>
                 ))}
               </div>
-              <article className="selected-question">
-                <div className="selected-meta">
-                  <span>{selectedQuestion.id}</span>
-                  <span>{selectedQuestion.composer} · {selectedQuestion.title}</span>
-                  <span>{selectedQuestion.scope}</span>
-                </div>
-                <h3>{selectedQuestion.question}</h3>
-                <div className="route-description">
-                  <span>{selectedQuestion.modality}</span>
-                  <p><strong>{modalityById[selectedQuestion.modality].label}</strong>{modalityById[selectedQuestion.modality].description}</p>
-                </div>
-                <div className="answer-contract">
-                  <p className="mini-label">Answer contract</p>
-                  <dl>
-                    <div><dt>Object</dt><dd>{selectedQuestion.answerType}</dd></div>
-                    <div><dt>Format</dt><dd>{selectedQuestion.answerFormat}</dd></div>
-                    <div><dt>Quantity</dt><dd>{selectedQuestion.answerQuantity}</dd></div>
-                  </dl>
-                  <div className="format-example"><span>Format example</span><code>{selectedQuestion.formatExample}</code></div>
-                  <p className="example-note">Response-shape example, not the ground-truth answer.</p>
-                </div>
-              </article>
-            </div>
-            <aside className="evidence-pane">
-              <Evidence question={selectedQuestion} />
-            </aside>
-          </div>
-        ) : (
-            <div className="empty-state">
-              <span>∅</span><h3>No curated example in this slice—yet.</h3>
-              <p>The released dataset still contains questions for this route. Choose “All routes” to continue the guided tour.</p>
-              <button onClick={() => chooseModality("ALL")}>Show all routes</button>
-            </div>
-        )}
+              {visibleCount < filtered.length && <button className="load-more" onClick={() => setVisibleCount((count) => count + 36)}>Show 36 more <span>{visibleCount} / {filtered.length}</span></button>}
+            </>
+          ) : <div className="load-state"><strong>No questions match this view.</strong><p>Clear a filter or search a different work.</p><button onClick={() => { setActiveModality("ALL"); setActiveTopic("ALL"); setActiveComposer("ALL"); setQuery(""); }}>Clear filters</button></div>}
       </section>
 
+      {selected && (
+        <section className="evidence" id="evidence">
+          <div className="evidence-heading"><h2>Question in context.</h2><p>Select another question above to change every surface below.</p></div>
+          <div className="evidence-layout">
+            <QuestionDetail question={selected} />
+            <EvidenceLab question={selected} roll={rolls[selected.pieceNumber]} />
+          </div>
+        </section>
+      )}
+
       <footer>
-        <div className="footer-mark"><span className="mark" aria-hidden="true"><i /><i /><i /></span><strong>MuSP—Bench</strong></div>
-        <p>Musical Score–Performance Understanding Benchmark</p>
-        <div>
-          <a href="https://huggingface.co/datasets/milan477/MuSP-Bench" target="_blank" rel="noreferrer">Dataset ↗</a>
-          <a href="https://github.com/vaclisinc/MuSP-demo" target="_blank" rel="noreferrer">GitHub ↗</a>
-          <a href="#top">Top ↑</a>
-        </div>
-        <small>Question text, modality labels, and answer contracts are drawn from the released dataset. Layer and scope labels in this guided tour are editorial groupings for explanation.</small>
+        <div className="footer-top"><a className="wordmark" href="#top"><span className="mini-mark"><i /><i /><i /></span><strong>MuSP<span>—Bench</span></strong></a><p>Written evidence.<br />Performed evidence.<br />One benchmark.</p></div>
+        <div className="footer-links"><a href={DATASET_URL}>Hugging Face ↗</a><a href={`${BASE}paper/MuSP_Bench.pdf`}>Paper PDF ↗</a><a href="https://github.com/vaclisinc/MuSP-demo">GitHub ↗</a><a href="#top">Back to top ↑</a></div>
+        <small>Question text, modality labels, and answer contracts are loaded from the released MuSP-Bench dataset. Editorial lenses are navigation aids only. Composer portraits: public-domain works via Wikimedia Commons. Piano-roll previews are derived from repository MusicXML; the performance playhead is proportional, not an alignment.</small>
       </footer>
     </main>
   );
