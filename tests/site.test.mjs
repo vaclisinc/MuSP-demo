@@ -12,6 +12,7 @@ test("builds a static GitHub Pages research demo", async () => {
   assert.match(html, /MuSP-Bench — Score–Performance Understanding/);
   assert.match(html, /\/assets\//);
   assert.doesNotMatch(html, /\/MuSP-demo\//);
+  assert.doesNotMatch(html, /rel=["'](?:shortcut )?icon["']|favicon/i);
   assert.match(app, /A human-authored, score–performance multimodal benchmark/);
   assert.match(app, /490 questions across 24 classical piano and orchestral works/);
   assert.match(app, /<iframe/);
