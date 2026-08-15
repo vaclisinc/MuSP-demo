@@ -10,7 +10,8 @@ test("builds a static GitHub Pages research demo", async () => {
     readFile(new URL("../dist/paper/MuSP_Bench.pdf", import.meta.url)),
   ]);
   assert.match(html, /MuSP-Bench — Score–Performance Understanding/);
-  assert.match(html, /\/MuSP-demo\/assets\//);
+  assert.match(html, /\/assets\//);
+  assert.doesNotMatch(html, /\/MuSP-demo\//);
   assert.match(app, /A human-authored, score–performance multimodal benchmark/);
   assert.match(app, /490 questions across 24 classical piano and orchestral works/);
   assert.match(app, /<iframe/);
