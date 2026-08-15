@@ -18,11 +18,18 @@ test("builds a static GitHub Pages research demo", async () => {
   assert.match(app, /function QuestionIndex/);
   assert.match(app, /function AudioPlayer/);
   assert.match(app, /function ScoreViewer/);
+  assert.match(app, /function ModalityIcon/);
+  assert.match(app, /Performance-only/);
+  assert.match(app, /Score-only/);
+  assert.match(app, /Content breadth/);
+  assert.match(app, /content-hierarchy/);
+  assert.match(app, /Question explorer/);
   assert.match(app, /Open index/);
   assert.match(app, /Hugging Face/);
   assert.equal([...questions.matchAll(/^"Q\d+"/gm)].length, 490);
   assert.ok(paper.length > 50_000);
   assert.doesNotMatch(app, /PIANO-ROLL LENS|tap-button|piano-roll|Tap tempo/);
+  assert.doesNotMatch(app, /Every question identifies what evidence|The full question set/);
   assert.doesNotMatch(app, /01 \/ THE QUESTION MAP|02 \/ FOUR ROUTES|03 \/|ANATOMY OF A QUESTION|WHY THIS BENCHMARK/);
 
   const composers = [

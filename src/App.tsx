@@ -26,10 +26,10 @@ const DATASET_URL = "https://huggingface.co/datasets/milan477/MuSP-Bench";
 
 const modalityOrder: Modality[] = ["P", "SP", "S/P", "S"];
 const modalityMeta: Record<Modality, { label: string; description: string }> = {
-  P: { label: "Performance", description: "The sounding performance contains the required evidence." },
+  P: { label: "Performance-only", description: "The sounding performance contains everything needed to answer." },
   SP: { label: "Score ↔ performance", description: "Answer by relating notation to its realization." },
   "S/P": { label: "Either route", description: "Score or performance can independently support the answer." },
-  S: { label: "Score", description: "The written score contains the required evidence." },
+  S: { label: "Score-only", description: "The written score contains everything needed to answer." },
 };
 
 const topicMeta: Record<Topic, string> = {
@@ -70,6 +70,20 @@ function IndexIcon() {
 
 function CloseIcon() {
   return <Icon><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></Icon>;
+}
+
+function ModalityIcon({ modality }: { modality: Modality }) {
+  const score = <><path d="M5 7h6M5 10h6M5 13h6M9 5v10.5a2 2 0 1 1-1.4-1.9" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" /><circle cx="6.2" cy="16.3" r="1.7" fill="currentColor" /></>;
+  const audio = <path d="M14 13v-2M17 16V8M20 14v-4" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />;
+  return (
+    <span className={`modality-icon modality-${modality.replace("/", "-")}`} aria-label={modalityMeta[modality].label}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        {modality === "P" && <path d="M5 13v-2M9 17V7M13 14v-4M17 18V6M21 13v-2" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />}
+        {modality === "S" && score}
+        {(modality === "SP" || modality === "S/P") && <>{score}{audio}{modality === "S/P" && <path d="M12.5 5v14" stroke="currentColor" strokeWidth="1" opacity=".35" />}</>}
+      </svg>
+    </span>
+  );
 }
 
 function PlayIcon({ playing }: { playing: boolean }) {
@@ -154,11 +168,14 @@ function Hero({ onExplore }: { onExplore: () => void }) {
         <div className="portrait portrait-bach"><Portrait composer="Bach" /><small>J. S. Bach</small></div>
         <div className="portrait portrait-beethoven"><Portrait composer="Beethoven" /><small>Beethoven</small></div>
         <div className="portrait portrait-debussy"><Portrait composer="Debussy" /><small>Debussy</small></div>
-        <p>COMPOSED<br />EVIDENCE</p>
+        <div className="portrait portrait-chopin"><Portrait composer="Chopin" /><small>Chopin</small></div>
+        <div className="portrait portrait-liszt"><Portrait composer="Liszt" /><small>Liszt</small></div>
+        <div className="portrait portrait-rachmaninoff"><Portrait composer="Rachmaninoff" /><small>Rachmaninoff</small></div>
+        <p>SCORE<br />MODALITY</p>
       </div>
 
       <div className="hero-performance" style={{ "--pianist": `url(${BASE}images/pianist-performance.webp)` } as CSSProperties}>
-        <p>PERFORMED<br />EVIDENCE</p>
+        <p>PERFORMANCE<br />MODALITY</p>
         <div className="performance-meter" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} />)}</div>
       </div>
 
@@ -185,18 +202,18 @@ function BenchmarkMap() {
     <section className="benchmark-map" aria-label="Benchmark coverage">
       <div className="map-intro">
         <h2>Two ways to read the benchmark.</h2>
-        <p>Every question identifies what evidence a model needs. Across those routes, the content moves from musical detail to interpretation of a complete work.</p>
       </div>
       <div className="map-column">
-        <h3>Evidence modality</h3>
+        <h3>Modality</h3>
         <div className="map-list modality-list">
-          {modalityOrder.map((modality) => <div key={modality}><span>{modality}</span><strong>{modalityMeta[modality].label}</strong></div>)}
+          {modalityOrder.map((modality) => <div key={modality}><ModalityIcon modality={modality} /><span><strong>{modalityMeta[modality].label}</strong><small>{modality}</small></span></div>)}
         </div>
       </div>
       <div className="map-column">
         <h3>Content breadth</h3>
-        <div className="map-list content-list">
-          {contentBands.map((band) => <div key={band.title}><strong>{band.title}</strong><small>{band.detail}</small></div>)}
+        <div className="content-hierarchy">
+          <span className="hierarchy-axis">detail <i /> whole work</span>
+          {contentBands.map((band, index) => <div key={band.title} style={{ "--level": index } as CSSProperties}><i /><span><strong>{band.title}</strong><small>{band.detail}</small></span></div>)}
         </div>
       </div>
     </section>
@@ -287,11 +304,13 @@ function QuestionDetail({ question }: { question: Question }) {
   const example = question.answerExample.replace(/^\["?|"?\]$/g, "").replace(/""/g, '"');
   return (
     <article className="question-detail">
-      <div className="question-meta"><span>{question.id} · PIECE {question.pieceNumber}</span><span>{topicMeta[question.topic]}</span></div>
-      <div className={`modality-badge modality-${question.modality.replace("/", "-")}`}><b>{question.modality}</b><span>{modalityMeta[question.modality].label}</span></div>
+      <div className="question-topline">
+        <div className="question-meta"><span>{question.id} · PIECE {question.pieceNumber}</span><span>{topicMeta[question.topic]}</span></div>
+        <div className="modality-badge"><ModalityIcon modality={question.modality} /><span>{modalityMeta[question.modality].label}</span></div>
+        <div className="work-line"><Portrait composer={question.composer} className="work-portrait" /><p><strong>{question.composer}</strong><span>{question.title}</span></p></div>
+      </div>
       <h3>{question.fullQuestion}</h3>
       <p className="route-copy">{modalityMeta[question.modality].description}</p>
-      <div className="work-line"><Portrait composer={question.composer} className="work-portrait" /><p><strong>{question.composer}</strong><span>{question.title}</span></p></div>
       <div className="answer-contract">
         <dl>
           <div><dt>Answer object</dt><dd>{question.answerObjectType}</dd></div>
@@ -391,13 +410,13 @@ export default function App() {
 
       <section className="explorer" id="explorer">
         <div className="explorer-heading">
-          <h2>The full question set,<br /><em>one question at a time.</em></h2>
-          <p>Filter the benchmark, then flip through the matching questions. Open the index only when you need to jump somewhere specific.</p>
+          <h2>Question explorer</h2>
+          <p>Browse all 490 released questions.</p>
         </div>
 
         <div className="filter-console">
           <div className="filter-group route-filter">
-            <span>Evidence</span>
+            <span>Modality</span>
             <button className={activeModality === "ALL" ? "active" : ""} onClick={() => updateFilter(() => setActiveModality("ALL"))}>All</button>
             {modalityOrder.map((modality) => <button key={modality} className={activeModality === modality ? "active" : ""} onClick={() => updateFilter(() => setActiveModality(modality))}>{modalityMeta[modality].label}</button>)}
           </div>
@@ -432,7 +451,7 @@ export default function App() {
       {indexOpen && <><button className="drawer-scrim" aria-label="Close question index" onClick={() => setIndexOpen(false)} /><QuestionIndex questions={filtered} selected={selected} onChoose={chooseQuestion} onClose={() => setIndexOpen(false)} /></>}
 
       <footer>
-        <div className="footer-top"><a className="wordmark" href="#top"><span className="mini-mark"><i /><i /><i /></span><strong>MuSP<span>—Bench</span></strong></a><p>Written evidence.<br />Performed evidence.<br />One benchmark.</p></div>
+        <div className="footer-top"><a className="wordmark" href="#top"><span className="mini-mark"><i /><i /><i /></span><strong>MuSP<span>—Bench</span></strong></a><p>Score modality.<br />Performance modality.<br />One benchmark.</p></div>
         <div className="footer-links"><a href={DATASET_URL}>Hugging Face ↗</a><a href={`${BASE}paper/MuSP_Bench.pdf`}>Paper PDF ↗</a><a href="https://github.com/vaclisinc/MuSP-demo">GitHub ↗</a><a href="#top">Back to top ↑</a></div>
         <small>Question text, modality labels, and answer contracts are loaded from the released MuSP-Bench dataset. Editorial lenses are navigation aids only. Composer portraits are public-domain or freely licensed images via Wikimedia Commons.</small>
       </footer>
