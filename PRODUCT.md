@@ -20,7 +20,7 @@ MuSP-Bench evaluates musical understanding across symbolic scores, audio perform
 
 ## Operating Context
 
-Visitors typically arrive from the paper or Hugging Face dataset, then move between benchmark framing, composers and works, question filters, score pages, recorded performances, and compact MIR views such as tempo and piano-roll context.
+Visitors typically arrive from the paper or Hugging Face dataset, then move from compact benchmark framing directly into a released question, its recorded performance and/or score evidence, and an optional full-set index.
 
 ## Capabilities and Constraints
 
@@ -46,7 +46,7 @@ Visitors typically arrive from the paper or Hugging Face dataset, then move betw
 
 ## Product Principles
 
-- Let visitors hear and inspect evidence before asking them to read methodology.
+- Let visitors enter a real question and inspect its evidence before asking them to read methodology.
 - Keep score, performance, and comparison routes legible at every step.
 - Make the full benchmark feel explorable without weakening canonical semantics.
 - Prefer real musical artifacts and people over generic research-dashboard decoration.

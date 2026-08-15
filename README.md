@@ -4,7 +4,7 @@ Research demo for **MuSP-Bench**, a human-authored benchmark for analytical and 
 
 The question explorer presents the complete released question set alongside the score PDF and/or performance audio needed to answer each item. Question wording, modality, and answer contracts come from the [released MuSP-Bench dataset](https://huggingface.co/datasets/milan477/MuSP-Bench). Content-level groupings in the interface are editorial aids, not additional canonical annotations.
 
-The evidence workbench includes performance-speed and tap-tempo controls plus score-derived piano-roll previews. The piano-roll playhead follows the performance proportionally and is explicitly not presented as a score–audio alignment.
+The explorer opens directly on a released question, with previous/next card navigation and an optional side index. Performance evidence uses a focused audio player; score evidence is presented with the relevant composer portrait and score pages.
 
 ## Development
 
