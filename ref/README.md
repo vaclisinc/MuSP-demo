@@ -1,5 +1,6 @@
 # Reference material
 
-`MuSP_Bench.pdf` is the user-supplied anonymous ISMIR LBD draft used to ground this demo.
+The paper used to ground this demo is kept in one canonical location:
+`public/paper/MuSP_Bench.pdf`.
 
-No public LaTeX source bundle was discoverable by the exact paper title on 2026-08-14, so the supplied PDF is retained here rather than silently substituting a different artifact.
+No public LaTeX source bundle was discoverable by the exact paper title on 2026-08-14, so the supplied PDF is retained in the site's public assets rather than silently substituting a different artifact.

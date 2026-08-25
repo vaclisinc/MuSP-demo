@@ -40,7 +40,7 @@ Visitors typically arrive from the paper or Hugging Face dataset, then move from
 ## Evidence on Hand
 
 - Released dataset: https://huggingface.co/datasets/milan477/MuSP-Bench
-- User-supplied paper PDF: `ref/MuSP_Bench.pdf`
+- Canonical paper PDF served by the site: `public/paper/MuSP_Bench.pdf`
 - Existing score PDFs, performance audio, canonical questions, and answer contracts referenced by `src/App.tsx`.
 - Source benchmark repository and tooling in sibling `../muno-lm`.
 
