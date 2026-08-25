@@ -9,7 +9,7 @@ test("builds a static GitHub Pages research demo", async () => {
     readFile(new URL("../dist/data/questions.csv", import.meta.url), "utf8"),
     readFile(new URL("../dist/paper/MuSP_Bench.pdf", import.meta.url)),
   ]);
-  assert.match(html, /MuSP-Bench — Score–Performance Understanding/);
+  assert.match(html, /MuSP-Bench(?::| —) Score(?:-|–)Performance Understanding/);
   assert.match(html, /\/assets\//);
   assert.doesNotMatch(html, /\/MuSP-demo\//);
   assert.doesNotMatch(html, /rel=["'](?:shortcut )?icon["']|favicon/i);
@@ -20,13 +20,16 @@ test("builds a static GitHub Pages research demo", async () => {
   assert.match(app, /460 open-ended questions/);
   assert.match(app, /<iframe/);
   assert.match(app, /function AudioPlayer/);
+  assert.match(app, /function JumpText/);
+  assert.match(app, /musp:seek-audio/);
+  assert.match(app, /AUDIO_DURATIONS/);
   assert.match(app, /function ScoreViewer/);
   assert.match(app, /function QuestionDetail/);
   assert.match(app, /Released answer/);
   assert.match(app, /function AnswerReveal/);
   assert.match(app, /function TapTempo/);
   assert.match(app, /function PianoHelper/);
-  assert.match(app, /function playPitch/);
+  assert.match(app, /function playPitches/);
   assert.match(app, /\[0, 1\]\.flatMap/);
   assert.match(app, /\["SP", "S\/P", "P", "S"\]/);
   assert.match(app, /return modality === "SP" \? "S&P"/);
