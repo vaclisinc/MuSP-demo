@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("builds a static GitHub Pages research demo", async () => {
@@ -13,33 +13,31 @@ test("builds a static GitHub Pages research demo", async () => {
   assert.match(html, /\/assets\//);
   assert.doesNotMatch(html, /\/MuSP-demo\//);
   assert.doesNotMatch(html, /rel=["'](?:shortcut )?icon["']|favicon/i);
-  assert.match(app, /A human-authored, score–performance multimodal benchmark/);
-  assert.match(app, /490 questions across 24 classical piano and orchestral works/);
+  assert.match(app, /Advanced multimodal benchmarking of music understanding across/);
+  assert.match(app, /className="score-word">score/);
+  assert.match(app, /className="performance-word">performance/);
+  assert.match(app, /18 classical piano pieces or movements and 6 orchestral excerpts/);
+  assert.match(app, /460 open-ended questions/);
   assert.match(app, /<iframe/);
-  assert.match(app, /function QuestionIndex/);
   assert.match(app, /function AudioPlayer/);
   assert.match(app, /function ScoreViewer/);
-  assert.match(app, /function RouteMark/);
-  assert.match(app, /Performance-only/);
-  assert.match(app, /Score-only/);
-  assert.match(app, /Content breadth/);
-  assert.match(app, /breadth-figure/);
+  assert.match(app, /function QuestionDetail/);
+  assert.match(app, /Released answer/);
+  assert.match(app, /function AnswerReveal/);
+  assert.match(app, /function TapTempo/);
+  assert.match(app, /function PianoHelper/);
+  assert.match(app, /function playPitch/);
+  assert.match(app, /\[0, 1\]\.flatMap/);
+  assert.match(app, /\["SP", "S\/P", "P", "S"\]/);
+  assert.match(app, /return modality === "SP" \? "S&P"/);
+  assert.match(app, /answer_example/);
+  assert.match(app, /answers: r\.answers/);
+  assert.match(app, /Performance only/);
+  assert.match(app, /Score only/);
   assert.match(app, /Question explorer/);
-  assert.match(app, /Question index/);
   assert.match(app, /Hugging Face/);
-  assert.equal([...questions.matchAll(/^"Q\d+"/gm)].length, 490);
+  assert.match(questions.split("\n", 1)[0], /"answer_example","answers"/);
+  assert.equal([...questions.matchAll(/^"musp_\d+"/gm)].length, 490);
   assert.ok(paper.length > 50_000);
-  assert.doesNotMatch(app, /PIANO-ROLL LENS|tap-button|piano-roll|Tap tempo/);
-  assert.doesNotMatch(app, /Every question identifies what evidence|The full question set/);
-  assert.doesNotMatch(app, /01 \/ THE QUESTION MAP|02 \/ FOUR ROUTES|03 \/|ANATOMY OF A QUESTION|WHY THIS BENCHMARK/);
-
-  const composers = [
-    "bach", "balakirev", "beethoven", "chopin", "debussy", "glinka", "haydn",
-    "liszt", "mozart", "rachmaninoff", "schubert", "schumann", "scriabin",
-  ];
-  await Promise.all(
-    composers.map((composer) =>
-      access(new URL(`../dist/images/composer-${composer}.webp`, import.meta.url)),
-    ),
-  );
+  assert.doesNotMatch(app, /pianist-performance|function Portrait/);
 });
