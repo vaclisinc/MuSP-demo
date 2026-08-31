@@ -12,6 +12,7 @@ type Question = {
 const BASE = import.meta.env.BASE_URL;
 const HF_ROOT = "https://huggingface.co/datasets/milan477/MuSP-Bench/resolve/main";
 const DATASET_URL = "https://huggingface.co/datasets/milan477/MuSP-Bench";
+const PAPER_URL = "https://arxiv.org/abs/2608.28212";
 const AUDIO_DURATIONS: Record<string, number> = {
   "inputs/audio/piece-01.wav": 482.249, "inputs/audio/piece-02.wav": 275.297, "inputs/audio/piece-03.wav": 1971.321,
   "inputs/audio/piece-04.wav": 2277.389, "inputs/audio/piece-05.wav": 2554.202, "inputs/audio/piece-06.wav": 2160.786,
@@ -163,7 +164,7 @@ export default function App() {
   const selected = filtered.find(q => q.id === selectedId) ?? filtered[0];
   const choose = (q: Question) => { setSelectedId(q.id); document.getElementById("question")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   return <main>
-    <header id="top"><a className="brand" href="#top">MuSP<span>Bench</span></a><nav><a href="#explore">Explore</a><a href={DATASET_URL} target="_blank" rel="noreferrer">Dataset <External /></a><a href={`${BASE}paper/MuSP_Bench.pdf`} target="_blank" rel="noreferrer">Paper <External /></a></nav></header>
+    <header id="top"><a className="brand" href="#top">MuSP<span>Bench</span></a><nav><a href="#explore">Explore</a><a href={DATASET_URL} target="_blank" rel="noreferrer">Dataset <External /></a><a href={PAPER_URL} target="_blank" rel="noreferrer">Paper <External /></a></nav></header>
     <section className="masthead"><div><p className="kicker">MuSP-Bench · 490 human-authored questions</p><h1>Advanced multimodal benchmarking of music understanding across <span className="score-word">score</span> and <span className="performance-word">performance</span></h1></div><div className="masthead-copy"><p><strong>18 classical piano pieces or movements and 6 orchestral excerpts.</strong> The benchmark combines 460 open-ended questions with predefined answer formats and 30 questions with multiple options.</p><p>Piano materials are derived from (n)ASAP and corrected using PianoCoRe consensus MIDI; orchestral scores and audio come from BSED.</p><a className="primary" href="#explore">Browse questions <Arrow /></a></div></section>
     <div className="composer-marquee" aria-label="Composers represented in MuSP-Bench"><div>{[0, 1].flatMap(copy => composerNames.map(name => <figure key={`${copy}-${name}`} aria-hidden={copy === 1}><img src={`${BASE}images/composer-${name}.webp`} alt="" /><figcaption>{name}</figcaption></figure>))}</div></div>
     <section className="routes"><div><p className="section-no">01 / Modalities</p><h2>Four routes to an answer.</h2><p>Canonical modality labels are preserved in the data; S&P is the interface label for SP.</p></div>{modalityOrder.map(m => <article key={m}><span className={`modality m-${m.replace("/", "-")}`}>{displayModality(m)}</span><h3>{modalityMeta[m].label}</h3><p>{modalityMeta[m].short}</p><strong>{questions.filter(q => q.modality === m).length || "—"}</strong></article>)}</section>
@@ -176,6 +177,6 @@ export default function App() {
       </div>}
       <p className="editorial-note">Filters are navigation aids. Question wording, modality labels, answers, and answer-contract fields are loaded from the released MuSP-Bench dataset.</p>
     </section>
-    <footer><div><a className="brand" href="#top">MuSP<span>Bench</span></a><p>Score–performance understanding,<br />made explorable.</p></div><div><a href={DATASET_URL}>Hugging Face <External /></a><a href={`${BASE}paper/MuSP_Bench.pdf`}>Paper <External /></a><a href="https://github.com/vaclisinc/MuSP-demo">GitHub <External /></a></div><small>MuSP-Bench · Research demo</small></footer>
+    <footer><div><a className="brand" href="#top">MuSP<span>Bench</span></a><p>Score–performance understanding,<br />made explorable.</p></div><div><a href={DATASET_URL}>Hugging Face <External /></a><a href={PAPER_URL} target="_blank" rel="noreferrer">Paper <External /></a><a href="https://github.com/vaclisinc/MuSP-demo">GitHub <External /></a></div><small>MuSP-Bench · Research demo</small></footer>
   </main>;
 }
