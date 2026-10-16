@@ -10,8 +10,8 @@ type Question = {
 };
 
 const BASE = import.meta.env.BASE_URL;
-const HF_ROOT = "https://huggingface.co/datasets/milan477/MuSP-Bench/resolve/main";
-const DATASET_URL = "https://huggingface.co/datasets/milan477/MuSP-Bench";
+const HF_ROOT = "https://huggingface.co/datasets/bryel-labs/MuSP-Bench/resolve/main";
+const DATASET_URL = "https://huggingface.co/datasets/bryel-labs/MuSP-Bench";
 const PAPER_URL = "https://arxiv.org/abs/2608.28212";
 const AUDIO_DURATIONS: Record<string, number> = {
   "inputs/audio/piece-01.wav": 482.249, "inputs/audio/piece-02.wav": 275.297, "inputs/audio/piece-03.wav": 1971.321,
