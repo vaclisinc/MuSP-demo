@@ -39,7 +39,7 @@ test("builds a static GitHub Pages research demo", async () => {
   assert.match(app, /Score only/);
   assert.match(app, /Question explorer/);
   assert.match(app, /href={DATASET_URL}[^>]*>Dataset/);
-  assert.match(app, /Accepted by ISMIR LBD/);
+  assert.match(app, /Accepted by ISMIR 2026 LBD/);
   assert.match(questions.split("\n", 1)[0], /"answer_example","answers"/);
   assert.equal([...questions.matchAll(/^"musp_\d+"/gm)].length, 490);
   assert.ok(paper.length > 50_000);
