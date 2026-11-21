@@ -41,3 +41,5 @@ footer{min-height:250px;margin-top:80px;padding:48px clamp(22px,4vw,64px);backgr
 .evidence-tabs>strong{display:flex;align-items:center;padding:0 14px;font-size:10px;text-transform:uppercase;letter-spacing:.1em}.evidence-view.dual-evidence{display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px}.evidence-view.dual-evidence .audio-card{height:auto}.evidence-view.dual-evidence .audio-card .media-head{height:42px}.evidence-view.dual-evidence .audio-card .player{height:70px}.evidence-view.dual-evidence .score-card{min-height:0}.evidence-view.dual-evidence .score-card iframe{min-height:0}
 
 .time-jump{display:inline-flex;align-items:center;gap:4px;margin:0 2px;padding:1px 5px;border:0;border-radius:3px;background:#dde9f5;color:#315f8d;font:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}.time-jump:hover{background:#c8dcef}.time-jump span{font:8px var(--sans);text-decoration:none}.answer-content .time-jump{font-family:var(--serif);font-size:inherit}
+
+.accepted-badge{display:inline-block;margin-right:12px;padding:4px 8px;background:var(--acid);color:var(--ink);letter-spacing:.12em}
